@@ -253,7 +253,6 @@ class Gros_Singe
         t.join
         next
       end
-
       # Gestion des messages utilisateurs
       if is_privmsg line
         t = Thread.new{handle_privmsg(line)}
