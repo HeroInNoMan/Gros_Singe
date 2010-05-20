@@ -232,7 +232,7 @@ class Gros_Singe
           end
           next
         end      
-l      end
+      end
       
       # Gestion des messages utilisateurs
       if is_privmsg line
