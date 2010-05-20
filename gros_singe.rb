@@ -261,13 +261,13 @@ class Gros_Singe
       # Gestion des commandes du bot
       if is_command line
         t = Thread.new{handle_command(line)}
-        t.join
+        t.run
         next
       end
       # Gestion des messages utilisateurs
       if is_privmsg line
         t = Thread.new{handle_privmsg(line)}
-        t.join
+        t.run
         next
       end
     end
