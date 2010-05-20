@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# coding: utf-8
 require 'socket'
 require 'sqlite3'
 
@@ -17,7 +18,7 @@ class Gros_Singe
     init_DB
     speak_answer("init", "")  if rand(@insult_rate) == 0
   end
-  
+
   def say(msg)
     puts "#{@nick} : " + msg
     @socket.puts msg
@@ -30,15 +31,15 @@ class Gros_Singe
   def say_action(msg)
     say "PRIVMSG ##{@channel} :#{1.chr}ACTION #{msg}#{1.chr}"
   end
-  
+
   def is_command(line)
     return line =~ /PRIVMSG ([^ :]+) +:!(.+)/
   end
-  
+
   def is_privmsg(line)
     return line =~ /PRIVMSG ([^ :]+) +:(.+)/
   end
-  
+
   def control_flood(sender)
     if sender == @old_sender
       @flood_counter+=1
@@ -50,7 +51,7 @@ class Gros_Singe
     end
     @old_sender = sender
   end
-  
+
   def init_DB
     @db = SQLite3::Database.new "gros_singe.db"
     @patterns = "patterns"
@@ -69,7 +70,7 @@ class Gros_Singe
       end
     end
   end
-  
+
   def pattern_exists(pattern)
     count = @db.get_first_value( "SELECT COUNT (*) FROM \"#{@taquets}\" WHERE key = \"#{pattern}\"" )
     unless Integer(count) == 0
@@ -122,7 +123,7 @@ class Gros_Singe
       end
     end
   end
-  
+
   def quote(key)
     count = @db.get_first_value( "SELECT COUNT (*) FROM \"#{@citations}\" WHERE key = \"#{key}\"" )
     unless Integer(count) == 0
@@ -140,18 +141,102 @@ class Gros_Singe
     total = 0
     say_loud "Liste des films :"
     @db.execute("SELECT DISTINCT key FROM \"#{@citations}\"") do |row|
-     count = @db.get_first_value("SELECT COUNT (*) FROM \"#{@citations}\" WHERE key = \"#{row[0]}\"")
+      count = @db.get_first_value("SELECT COUNT (*) FROM \"#{@citations}\" WHERE key = \"#{row[0]}\"")
       say_loud "#{row[0]} (#{count})"
       total = total + Integer(count)
     end
     say_loud "* Total : #{total}"
   end
 
+  def handle_command(line)
+    m, sender, target, command = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:!(.+)/)
+    if target == "##{@channel}"
+      control_flood sender
+      arg = command[/[^ ]+ +(.+)/, 1]
+      case command
+      when /^help$/
+        say_loud "!help : affiche la liste des commandes."
+        #             say_loud "!refresh : synchronise à la base de données."
+        say_loud "!fréquence <X> : insulte les gens toutes les X interventions en moyenne."
+        say_loud "!fréquence : affiche la fréquence d'insulte actuelle."
+        say_loud "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern."
+        say_loud "!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me)."
+        say_loud "!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions."
+        say_loud "!patterns : affiche la liste des patterns existants."
+        say_loud "!quotes : affiche la liste des films disponibles."
+        say_loud "!quote : affiche une citation au hasard."
+        say_loud "!quote <film> : affiche une citation tirée de <film>."
+        say_loud "!quote <film> <citation> : ajoute la citation <citation> au film <film>."
+      when /^refresh$/
+        say_loud "Synchronisation avec la base..."
+        init_DB
+        say_loud "Terminé !"
+      when /^bite$/
+        say_action "fourre sa bite dans les fesses de #{sender}."
+      when /^addaction (\w*) (.*)$/
+        if pattern_exists($1)
+          add_taquet($1, $2, "action")
+          say_loud "C'est noté !"
+        end
+      when /^add (\w*) (.*)$/
+        if pattern_exists($1)
+          add_taquet($1, $2, "loud")
+          say_loud "C'est noté !"
+        end
+      when /^addpattern (\w*) (.*)$/
+        unless pattern_exists($1)
+          add_pattern($1, $2)
+          say_loud "Pattern ajouté !"
+        end
+      when /^patterns$/
+        list_patterns
+      when /^fréquence$/
+        say_loud "Fréquence des insultes : #{@insult_rate}."
+      when /^fréquence (\d+)$/
+        freq = Integer($1)
+        if freq > 100
+          say_loud "Nan mais là c'est beaucoup trop. Je vais plus jamais parler maintenant ! Je refuse. Essaye encore."
+        end
+        if freq == 0
+          say_loud "Ok, je ferme ma gueule. Mais je reviendrai tas de punaises."
+        end
+        @insult_rate = freq
+        say_loud "Fréquence des insultes initialisée à #{$1}."
+        puts @insult_rate
+      when /^quote$/
+        random_quote
+      when /^quote (\w*)$/
+        quote($1)
+      when /^quote (\w*) (.*)$/
+        add_quote($1, $2)
+      when /^quotes$/
+        list_quotes
+      end
+    end      
+  end
+
+  def handle_privmsg(line)
+    m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)    
+    if target == "##{@channel}"
+      control_flood sender
+      unless find_pattern(msg, sender)
+        case msg
+        when /^(.*\s)*(\w{7})(\s.*)*$/i
+          say_loud "C'est toi le #{$2} !" if rand(@insult_rate) == 0
+        when /^(.* )?#{@nick}[:)]?( .*)?$/i
+          speak_answer("hilight", sender) if rand(3) == 0
+        else speak_answer("gratuit", sender) if rand(@insult_rate) == 0
+        end
+      end
+    end
+  end
+
   def run
     while line = @socket.gets.strip
       puts line
-      
+
       # Gestion du ping
+      # On le traite directement, sans passer par un thread
       if line =~/^PING :(.*)/
         sender = line.match(/^PING :(.*)/)
         say "PONG #{sender}"
@@ -159,106 +244,31 @@ class Gros_Singe
       end
 
       # Gestion du flood
-      if @old_line == line
-        next
-      end
+      next if @old_line == line
       @old_line = line
 
       # Gestion des commandes du bot
       if is_command line
-        m, sender, target, command = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:!(.+)/)
-        if target == "##{@channel}"
-          control_flood sender
-          arg = command[/[^ ]+ +(.+)/, 1]
-          case command
-          when /^help$/
-            say_loud "!help : affiche la liste des commandes."
-#             say_loud "!refresh : synchronise à la base de données."
-            say_loud "!fréquence <X> : insulte les gens toutes les X interventions en moyenne."
-            say_loud "!fréquence : affiche la fréquence d'insulte actuelle."
-            say_loud "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern."
-            say_loud "!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me)."
-            say_loud "!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions."
-            say_loud "!patterns : affiche la liste des patterns existants."
-            say_loud "!quotes : affiche la liste des films disponibles."
-            say_loud "!quote : affiche une citation au hasard."
-            say_loud "!quote <film> : affiche une citation tirée de <film>."
-            say_loud "!quote <film> <citation> : ajoute la citation <citation> au film <film>."
-          when /^refresh$/
-            say_loud "Synchronisation avec la base..."
-            init_DB
-            say_loud "Terminé !"
-          when /^bite$/
-            say_action "fourre sa bite dans les fesses de #{sender}."
-          when /^addaction (\w*) (.*)$/
-            if pattern_exists($1)
-              add_taquet($1, $2, "action")
-              say_loud "C'est noté !"
-            end
-          when /^add (\w*) (.*)$/
-            if pattern_exists($1)
-              add_taquet($1, $2, "loud")
-              say_loud "C'est noté !"
-            end
-          when /^addpattern (\w*) (.*)$/
-            unless pattern_exists($1)
-              add_pattern($1, $2)
-              say_loud "Pattern ajouté !"
-            end
-          when /^patterns$/
-            list_patterns
-          when /^fréquence$/
-            say_loud "Fréquence des insultes : #{@insult_rate}."
-          when /^fréquence (\d+)$/
-            freq = Integer($1)
-            if freq > 100
-              say_loud "Nan mais là c'est beaucoup trop. Je vais plus jamais parler maintenant ! Je refuse. Essaye encore."
-              next
-            end
-            if freq == 0
-              say_loud "Ok, je ferme ma gueule. Mais je reviendrai tas de punaises."
-            end
-            @insult_rate = freq
-            say_loud "Fréquence des insultes initialisée à #{$1}."
-            puts @insult_rate
-          when /^quote$/
-            random_quote
-          when /^quote (\w*)$/
-            quote($1)
-          when /^quote (\w*) (.*)$/
-            add_quote($1, $2)
-          when /^quotes$/
-            list_quotes
-          end
-          next
-        end      
-l      end
-      
+        t = Thread.new{handle_command(line)}
+        t.join
+        next
+      end
+
       # Gestion des messages utilisateurs
       if is_privmsg line
-        m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)    
-        if target == "##{@channel}"
-          control_flood sender
-          unless find_pattern(msg, sender)
-            case msg
-            when /^(.*\s)*(\w{7})(\s.*)*$/i
-              say_loud "C'est toi le #{$2} !" if rand(@insult_rate) == 0
-            when /^(.* )?#{@nick}[:)]?( .*)?$/i
-              speak_answer("hilight", sender) if rand(3) == 0
-            else speak_answer("gratuit", sender) if rand(@insult_rate) == 0
-            end
-          end
-        end
+        t = Thread.new{handle_privmsg(line)}
+        t.join
+        next
       end
     end
   end
-end
+end 
 
 chan_arg = ARGV[0]
 nick_arg = ARGV[1]
 chan_arg = "***" unless chan_arg
 nick_arg = "Gros_Singe" unless nick_arg
-bot = Gros_Singe.new 'irc.***.org', '6667', "#{chan_arg}", "#{nick_arg}"
+bot = Gros_Singe.new 'irc.rezosup.org', '6667', "#{chan_arg}", "#{nick_arg}"
 bot.run
 
 # EOF
