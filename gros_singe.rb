@@ -235,7 +235,7 @@ class Gros_Singe
     while line = @socket.gets.strip
 
       #Si on a ruby1.8 (ou avant), y'a pas la méthode encoding
-      if "bite".respond?_to(:encoding)
+      if "bite".respond_to?(:encoding)
         line.force_encoding("UTF-8")
         #Si la longueur en octets et en chars est la même, ptet qu'on était en latin
         if line.length == line.bytesize
