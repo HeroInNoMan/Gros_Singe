@@ -2,6 +2,34 @@
 require 'socket'
 require 'sqlite3'
 
+class Timeout
+  def initialize(tps, &blk)
+    @last = Time.now
+    @thread = Thread.new do
+      while true do
+        sleep(1)
+        if Time.now - @last > tps
+          blk.call
+          @last = Time.now
+        end
+      end
+    end
+    @thread.run
+  end
+
+  def reset
+    @last = Time.now
+  end
+
+  def stop
+    @thread.stop
+  end
+
+  def run
+    @thread.run
+  end
+end
+
 class Gros_Singe
   def initialize(server, port, channel, nick)
     @flood_counter = 0
@@ -148,6 +176,7 @@ class Gros_Singe
   end
 
   def run
+    gaehn = Timeout.new(600) { say_loud("Arrr... je me fais chier !")}
     while line = @socket.gets.strip
       puts line
       
@@ -157,6 +186,8 @@ class Gros_Singe
         say "PONG #{sender}"
         next
       end
+      
+      gaehn.reset
 
       # Gestion du flood
       if @old_line == line
