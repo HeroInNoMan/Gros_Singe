@@ -295,6 +295,7 @@ class Gros_Singe
         t.run
         next
       end
+
       # Gestion des messages utilisateurs
       if is_privmsg line
         t = Thread.new{handle_privmsg(line)}
@@ -309,7 +310,7 @@ chan_arg = ARGV[0]
 nick_arg = ARGV[1]
 chan_arg = "***" unless chan_arg
 nick_arg = "Gros_Singe" unless nick_arg
-bot = Gros_Singe.new 'irc.rezosup.org', '6667', "#{chan_arg}", "#{nick_arg}"
+bot = Gros_Singe.new 'irc.***.org', '6667', "#{chan_arg}", "#{nick_arg}"
 bot.run
 
 # EOF
