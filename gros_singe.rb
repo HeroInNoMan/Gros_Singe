@@ -260,7 +260,7 @@ class Gros_Singe
   end
 
   def run
-    gaehn = Timeout.new(6000) { say_loud("Arrr... je me fais chier !")}
+    gaehn = Timeout.new(6000) { random_quote}
     while line = @socket.gets.strip
 
       #Si on a ruby1.8 (ou avant), y'a pas la méthode encoding
