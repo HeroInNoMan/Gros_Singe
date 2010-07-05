@@ -260,7 +260,7 @@ class Gros_Singe
   end
 
   def run
-    gaehn = Timeout.new(600) { say_loud("Arrr... je me fais chier !")}
+    gaehn = Timeout.new(6000) { say_loud("Arrr... je me fais chier !")}
     while line = @socket.gets.strip
 
       #Si on a ruby1.8 (ou avant), y'a pas la méthode encoding
@@ -292,14 +292,12 @@ class Gros_Singe
       # Gestion des commandes du bot
       if is_command line
         t = Thread.new{handle_command(line)}
-        t.run
         next
       end
 
       # Gestion des messages utilisateurs
       if is_privmsg line
         t = Thread.new{handle_privmsg(line)}
-        t.run
         next
       end
     end
@@ -310,7 +308,7 @@ chan_arg = ARGV[0]
 nick_arg = ARGV[1]
 chan_arg = "***" unless chan_arg
 nick_arg = "Gros_Singe" unless nick_arg
-bot = Gros_Singe.new 'irc.***.org', '6667', "#{chan_arg}", "#{nick_arg}"
+bot = Gros_Singe.new 'irc.rezosup.org', '6667', "#{chan_arg}", "#{nick_arg}"
 bot.run
 
 # EOF
