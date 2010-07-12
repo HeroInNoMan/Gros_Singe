@@ -260,19 +260,8 @@ class Gros_Singe
   end
 
   def run
-    gaehn = Timeout.new(6000) { random_quote}
+    gaehn = Timeout.new(6000) { random_quote }
     while line = @socket.gets.strip
-
-      #Si on a ruby1.8 (ou avant), y'a pas la méthode encoding
-      if "bite".respond_to?(:encoding)
-        line.force_encoding("UTF-8")
-        #Si la longueur en octets et en chars est la même, ptet qu'on était en latin
-        if line.length == line.bytesize
-          line.force_encoding("ISO-8859-9")
-          line.encode!("UTF-8")
-        end
-      end
-
       puts line
 
       # Gestion du ping
