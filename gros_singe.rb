@@ -2,6 +2,7 @@
 # coding: utf-8
 require 'socket'
 require 'sqlite3'
+require 'yaml'
 
 class Timeout
   def initialize(tps, &blk)
@@ -32,15 +33,16 @@ class Timeout
 end
 
 class Gros_Singe
-  def initialize(server, port, channel, nick)
+  def initialize(server, port, channel, nick, pwd)
     @flood_counter = 0
     @insult_rate = 40
     @server = server
     @port = port
     @channel = channel
     @nick = nick
+    @pwd = pwd
     @socket = TCPSocket.new server, port
-    ["NICK #{@nick}", "USER #{@nick} 0 * :NSSIrc user", "JOIN ##{@channel}", "PRIVMSG NICKSERV : IDENTIFY ***"].each { |command|
+    ["NICK #{@nick}", "USER #{@nick} 0 * :NSSIrc user", "JOIN ##{@channel}", "PRIVMSG NICKSERV : IDENTIFY #{@pwd}"].each { |command|
       say command
     }
     init_DB
@@ -293,11 +295,8 @@ class Gros_Singe
   end
 end 
 
-chan_arg = ARGV[0]
-nick_arg = ARGV[1]
-chan_arg = "***" unless chan_arg
-nick_arg = "Gros_Singe" unless nick_arg
-bot = Gros_Singe.new 'irc.rezosup.org', '6667', "#{chan_arg}", "#{nick_arg}"
+conf = YAML.parse_file('gros_singe.yaml')
+bot = Gros_Singe.new conf["server"].value, conf["port"].value, conf["channel"].value, conf["nick"].value, conf["pwd"].value
 bot.run
 
 # EOF
