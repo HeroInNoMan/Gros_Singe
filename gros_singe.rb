@@ -35,6 +35,10 @@ class Gros_Singe
     say "PRIVMSG ##{@channel} :#{1.chr}ACTION #{msg}#{1.chr}"
   end
 
+  def whisper(nick, msg)
+    say "PRIVMSG #{nick} :#{msg}"
+  end
+
   def is_command(line)
     return line =~ /PRIVMSG ([^ :]+) +:!(.+)/
   end
@@ -109,13 +113,13 @@ class Gros_Singe
     @db.execute( "INSERT INTO \"#{@patterns}\" VALUES (\"#{name}\", \"#{pattern}\")" ) unless pattern_exists(name)
   end
 
-  def list_patterns
+  def list_patterns(sender)
     liste = ""
-    say_loud "Liste des patterns :"
+    whisper(sender, "Liste des patterns :")
     @db.execute("SELECT key FROM \"#{@patterns}\"") do |row|
       liste << row[0] + " | "
     end
-    say_loud liste
+    whisper(sender, liste)
   end
 
   def add_taquet(pattern, taquet, speak_type)
@@ -151,15 +155,15 @@ class Gros_Singe
     say_loud "Citation ajoutée !"
   end
 
-  def list_quotes
+  def list_quotes(sender)
     total = 0
-    say_loud "Liste des films :"
+    whisper(sender, "Liste des films :")
     @db.execute("SELECT DISTINCT key FROM \"#{@citations}\"") do |row|
       count = @db.get_first_value("SELECT COUNT (*) FROM \"#{@citations}\" WHERE key = \"#{row[0]}\"")
-      say_loud "#{row[0]} (#{count})"
+      whisper(sender, "#{row[0]} (#{count})")
       total = total + Integer(count)
     end
-    say_loud "* Total : #{total}"
+    whisper(sender, "* Total : #{total}")
   end
 
   def handle_command(line)
@@ -169,18 +173,18 @@ class Gros_Singe
       arg = command[/[^ ]+ +(.+)/, 1]
       case command
       when /^help$/
-        say_loud "!help : affiche la liste des commandes."
-        #             say_loud "!refresh : synchronise à la base de données."
-        say_loud "!fréquence <X> : insulte les gens toutes les X interventions en moyenne."
-        say_loud "!fréquence : affiche la fréquence d'insulte actuelle."
-        say_loud "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern."
-        say_loud "!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me)."
-        say_loud "!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions."
-        say_loud "!patterns : affiche la liste des patterns existants."
-        say_loud "!quotes : affiche la liste des films disponibles."
-        say_loud "!quote : affiche une citation au hasard."
-        say_loud "!quote <film> : affiche une citation tirée de <film>."
-        say_loud "!quote <film> <citation> : ajoute la citation <citation> au film <film>."
+        whisper(sender, "!help : affiche la liste des commandes.")
+        #             whisper(sender, "!refresh : synchronise à la base de données.")
+        whisper(sender, "!fréquence <X> : insulte les gens toutes les X interventions en moyenne.")
+        whisper(sender, "!fréquence : affiche la fréquence d'insulte actuelle.")
+        whisper(sender, "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
+        whisper(sender, "!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me).")
+        whisper(sender, "!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions.")
+        whisper(sender, "!patterns : affiche la liste des patterns existants.")
+        whisper(sender, "!quotes : affiche la liste des films disponibles.")
+        whisper(sender, "!quote : affiche une citation au hasard.")
+        whisper(sender, "!quote <film> : affiche une citation tirée de <film>.")
+        whisper(sender, "!quote <film> <citation> : ajoute la citation <citation> au film <film>.")
       when /^refresh$/
         say_loud "Synchronisation avec la base..."
         init_DB
@@ -203,7 +207,7 @@ class Gros_Singe
           say_loud "Pattern ajouté !"
         end
       when /^patterns$/
-        list_patterns
+        list_patterns(sender)
       when /^fréquence$/
         say_loud "Fréquence des insultes : #{@insult_rate}."
       when /^fréquence (\d+)$/
@@ -224,7 +228,7 @@ class Gros_Singe
       when /^quote (\w*) (.*)$/
         add_quote($1, $2)
       when /^quotes$/
-        list_quotes
+        list_quotes(sender)
       end
     end      
   end
