@@ -3,39 +3,12 @@
 require 'socket'
 require 'sqlite3'
 require 'yaml'
-
-class Timeout
-  def initialize(tps, &blk)
-    @last = Time.now
-    @thread = Thread.new do
-      while true do
-        sleep(1)
-        if Time.now - @last > tps
-          blk.call
-          @last = Time.now
-        end
-      end
-    end
-    @thread.run
-  end
-
-  def reset
-    @last = Time.now
-  end
-
-  def stop
-    @thread.stop
-  end
-
-  def run
-    @thread.run
-  end
-end
+require 'Timeout'
 
 class Gros_Singe
   def initialize(server, port, channel, nick, pwd)
     @flood_counter = 0
-    @insult_rate = 40
+    @insult_rate = 10
     @server = server
     @port = port
     @channel = channel
@@ -88,19 +61,30 @@ class Gros_Singe
     @citations = "citations"
     @taquets = "taquets"
   end
-
+  
   def find_pattern(msg, sender)
     @db.execute( "SELECT * FROM \"#{@patterns}\"" ) do |row|
-      if msg =~ Regexp.compile(row[1], Regexp::IGNORECASE)
-        puts "match :"
-        puts row[1]
-        puts row[0]
-        speak_answer(row[0], sender) if rand(3) == 0
-        return 1
+      if row[1] and row[1].match(msg)
+        return row
       end
     end
+    return nil
   end
-
+  
+  def trigger_pattern(pattern_name, pattern, sender)
+    if(pattern)
+      puts "\tmatched pattern: " + pattern_name
+      puts "\tregexp: " + pattern
+    end
+    loto = rand(@insult_rate)
+    if loto == 0
+      puts "\tanswer triggered!"
+      speak_answer(pattern_name, sender)
+    else
+      puts "\tno answer triggered (" + loto.to_s + "/" + @insult_rate.to_s + ")"
+    end
+  end
+  
   def pattern_exists(pattern)
     count = @db.get_first_value( "SELECT COUNT (*) FROM \"#{@taquets}\" WHERE key = \"#{pattern}\"" )
     unless Integer(count) == 0
@@ -115,7 +99,7 @@ class Gros_Singe
       row = rows[rand(rows.size)]
       if row[2] == "action"
         say_action row[1].gsub("nick", sender)
-      else
+      elsif row[2] == "loud"
         say_loud row[1].gsub("nick", sender)
       end
     end
@@ -249,18 +233,24 @@ class Gros_Singe
     m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)    
     if target == "##{@channel}"
       control_flood sender
-      unless find_pattern(msg, sender)
-        case msg
-        when /^(.*\s)*(\w{7})(\s.*)*$/i
-          say_loud "C'est toi le #{$2} !" if rand(@insult_rate) == 0
-        when /^(.* )?#{@nick}[:)]?( .*)?$/i
-          speak_answer("hilight", sender) if rand(3) == 0
-        else speak_answer("gratuit", sender) if rand(@insult_rate) == 0
-        end
+      row = find_pattern(msg, sender)
+      if(row)
+        trigger_pattern(row[0], row[1], sender)
+        return
+      end
+      case msg
+      when /^(.*\s)*(\w{7})(\s.*)*$/i
+        say_loud "C'est toi le #{$2} !" if rand(@insult_rate) == 0
+        return
+      when /^(.*\s)*#{@nick}(.*\s)*$/i
+        trigger_pattern("hilight", "^(.* )?#{@nick}[,:\)]?( .*)?$", sender)
+        return
+      else
+        trigger_pattern("gratuit", nil, sender)
       end
     end
   end
-
+  
   def run
     gaehn = Timeout.new(6000) { random_quote }
     while line = @socket.gets.strip
