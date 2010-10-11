@@ -1,7 +1,8 @@
 -- Script de création et de population des tables liées au Gros_Singe
 
 BEGIN TRANSACTION;
-DROP TABLE IF EXISTS taquets, patterns;
+DROP TABLE IF EXISTS taquets;
+DROP TABLE IF EXISTS patterns;
 
 CREATE TABLE patterns(key, pattern);
 CREATE TABLE taquets(key, text, output);
@@ -56,6 +57,8 @@ INSERT INTO "taquets" VALUES('hilight','court se cacher.','action');
 INSERT INTO "taquets" VALUES('hilight','Taggle nick !!!','loud');
 INSERT INTO "taquets" VALUES('hilight','fait un sourire à nick.','action');
 INSERT INTO "taquets" VALUES('hilight','Fais pas le malin, toi !','loud');
+INSERT INTO "taquets" VALUES('hilight','Mais je t''emmerde !','loud');
+INSERT INTO "taquets" VALUES('hilight','Ferme-là, nick, vraiment. S''il te plaît.','loud');
 INSERT INTO "taquets" VALUES('lol','Tu trouves ça drôle ?','loud');
 INSERT INTO "taquets" VALUES('lol','Et ça te fait rire ?','loud');
 INSERT INTO "taquets" VALUES('lol','Et tu connais celle des deux pédés dans un ascenseur ?','loud');

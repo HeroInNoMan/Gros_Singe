@@ -242,8 +242,8 @@ class Gros_Singe
       when /^(.*\s)*(\w{7})(\s.*)*$/i
         say_loud "C'est toi le #{$2} !" if rand(@insult_rate) == 0
         return
-      when /^(.*\s)*#{@nick}(.*\s)*$/i
-        trigger_pattern("hilight", "^(.* )?#{@nick}[,:\)]?( .*)?$", sender)
+      when /#{@nick}/i
+        trigger_pattern("hilight", nil, sender)
         return
       else
         trigger_pattern("gratuit", nil, sender)
