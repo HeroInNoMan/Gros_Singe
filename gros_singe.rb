@@ -3,6 +3,7 @@
 require 'socket'
 require 'sqlite3'
 require 'yaml'
+require 'thread'
 require 'Timeout'
 
 class Gros_Singe
@@ -15,6 +16,7 @@ class Gros_Singe
     @nick = nick
     @pwd = pwd
     @socket = TCPSocket.new server, port
+    @mutex = Mutex.new
     ["NICK #{@nick}", "USER #{@nick} 0 * :NSSIrc user", "JOIN ##{@channel}", "PRIVMSG NICKSERV : IDENTIFY #{@pwd}"].each { |command|
       say command
     }
@@ -23,8 +25,10 @@ class Gros_Singe
   end
 
   def say(msg)
-    puts "#{@nick} : " + msg
-    @socket.puts msg
+    @mutex.synchronize{
+      puts "#{@nick} : " + msg
+      @socket.puts msg
+    }
   end
 
   def say_loud(msg)
