@@ -248,7 +248,14 @@ class Gros_Singe
       end
       case msg
       when /^(.*\s)*(\w{7})(\s.*)*$/i
-        say_loud "C'est toi le #{$2} !" if rand(@insult_rate) == 0
+        if rand(@insult_rate) == 0
+          mot = $2
+          if mot[0..0] =~ /[aeiouyéævêâî]/i
+            say_loud "C'est toi l'#{$2} !"
+          else
+            say_loud "C'est toi l'#{$2} !"
+          end
+        end
         return
       when /#{@nick}/i
         trigger_pattern("hilight", nil, sender)
