@@ -9,7 +9,8 @@ require 'Timeout'
 class Gros_Singe
   def initialize(server, port, channel, nick, pwd)
     @flood_counter = 0
-    @insult_rate = 10
+    @insult_rate = 42
+    @reactionProba = 4
     @server = server
     @port = port
     @channel = channel
@@ -21,7 +22,7 @@ class Gros_Singe
       say command
     }
     init_DB
-    speak_answer("init", "")  if rand(@insult_rate) == 0
+    speak_answer("init", "")  if rand(4) == 0
   end
 
   def say(msg)
@@ -72,24 +73,24 @@ class Gros_Singe
   
   def find_pattern(msg, sender)
     @db.execute( "SELECT * FROM \"#{@patterns}\"" ) do |row|
-      if row[1] and row[1].match(msg)
-        return row
+      if row[1] and /#{row[1]}/.match(msg)
+          return row
       end
     end
     return nil
   end
   
-  def trigger_pattern(pattern_name, pattern, sender)
+  def trigger_pattern(pattern_name, pattern, sender, probability)
     if(pattern)
       puts "\tmatched pattern: " + pattern_name
       puts "\tregexp: " + pattern
     end
-    loto = rand(@insult_rate)
+    loto = rand(probability)
     if loto == 0
       puts "\tanswer triggered!"
       speak_answer(pattern_name, sender)
     else
-      puts "\tno answer triggered (" + loto.to_s + "/" + @insult_rate.to_s + ")"
+      puts "\tno answer triggered (" + loto.to_s + "/" + probability.to_s + ")"
     end
   end
   
@@ -178,7 +179,7 @@ class Gros_Singe
       case command
       when /^help$/
         whisper(sender, "!help : affiche la liste des commandes.")
-        #             whisper(sender, "!refresh : synchronise à la base de données.")
+        # whisper(sender, "!refresh : synchronise à la base de données.")
         whisper(sender, "!fréquence <X> : insulte les gens toutes les X interventions en moyenne.")
         whisper(sender, "!fréquence : affiche la fréquence d'insulte actuelle.")
         whisper(sender, "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
@@ -213,7 +214,7 @@ class Gros_Singe
       when /^patterns$/
         list_patterns(sender)
       when /^fréquence$/
-        say_loud "Fréquence des insultes : #{@insult_rate}."
+        say_loud "Fréquence des insultes : 1/#{@insult_rate}."
       when /^fréquence (\d+)$/
         freq = Integer($1)
         if freq > 100
@@ -223,7 +224,7 @@ class Gros_Singe
           say_loud "Ok, je ferme ma gueule. Mais je reviendrai tas de punaises."
         end
         @insult_rate = freq
-        say_loud "Fréquence des insultes initialisée à #{$1}."
+        say_loud "Fréquence des insultes initialisée à 1/#{$1}."
         puts @insult_rate
       when /^quote$/
         random_quote
@@ -238,30 +239,30 @@ class Gros_Singe
   end
 
   def handle_privmsg(line)
-    m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)    
+    m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)
     if target == "##{@channel}"
       control_flood sender
       row = find_pattern(msg, sender)
       if(row)
-        trigger_pattern(row[0], row[1], sender)
+        trigger_pattern(row[0], row[1], sender, @reactionProba)
         return
       end
       case msg
-      when /^(.*\s)*(\w{7})(\s.*)*$/i
+      when /^(.*\s)*(\w{6,8})(\s.*)*$/i
         if rand(@insult_rate) == 0
           mot = $2
-          if mot[0..0] =~ /[aeiouyéævêâî]/i
-            say_loud "C'est toi l'#{$2} !"
+          if mot[0..0] =~ /[aeiouyéèïëöæœêâî]/i
+            say_loud "C'est toi l'#{mot} !"
           else
-            say_loud "C'est toi l'#{$2} !"
+            say_loud "C'est toi le #{mot} !"
           end
         end
         return
       when /#{@nick}/i
-        trigger_pattern("hilight", nil, sender)
+        trigger_pattern("hilight", nil, sender, 1)
         return
       else
-        trigger_pattern("gratuit", nil, sender)
+        trigger_pattern("gratuit", nil, sender, @insult_rate)
       end
     end
   end
