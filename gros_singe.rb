@@ -24,8 +24,8 @@ class Gros_Singe
     end
   end
 
-  def control_flood(sender)
-    if sender == @old_sender
+  def control_flood(sender, chan)
+    if sender == @old_sender and chan == @channel
       @flood_counter+=1
     else @flood_counter = 0
     end
@@ -53,116 +53,125 @@ class Gros_Singe
     return nil
   end
 
-  def focus_channel(chan)
-    @channel = chan
-  end
-
   def handle_command(line)
     m, sender, target, command = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:!(.+)/)
-    if target == "##{@channel}"
-      control_flood sender
-      arg = command[/[^ ]+ +(.+)/, 1]
-      case command
-      when /^help$/
-        whisper(sender, "!help : affiche la liste des commandes.")
-        # whisper(sender, "!refresh : synchronise à la base de données.")
-        whisper(sender, "!fréquence <X> : insulte les gens toutes les X interventions en moyenne.")
-        whisper(sender, "!fréquence : affiche la fréquence d'insulte actuelle.")
-#       whisper(sender, "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
-#       whisper(sender, "!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me).")
-#       whisper(sender, "!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions.")
-#       whisper(sender, "!patterns : affiche la liste des patterns existants.")
+    if @nick == target
+      whisper(sender, "je parle pas en privé !")
+    elsif target.start_with?('#')
+      chan = target.split('#')[1]
+      if @channels.include?(chan)
+        control_flood(sender, chan)
+        @channel = chan
+        arg = command[/[^ ]+ +(.+)/, 1]
+        case command
+        when /^help$/
+          whisper(sender, "!help : affiche la liste des commandes.")
+          # whisper(sender, "!refresh : synchronise à la base de données.")
+          whisper(sender, "!fréquence <X> : insulte les gens toutes les X interventions en moyenne.")
+          whisper(sender, "!fréquence : affiche la fréquence d'insulte actuelle.")
+          #       whisper(sender, "!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
+          #       whisper(sender, "!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me).")
+          #       whisper(sender, "!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions.")
+          #       whisper(sender, "!patterns : affiche la liste des patterns existants.")
         whisper(sender, "!quotes : affiche la liste des tags disponibles.")
-        whisper(sender, "!quote : affiche une citation au hasard.")
-        whisper(sender, "!quote <tag> : affiche une citation tirée de <tag>.")
-        whisper(sender, "!quote <tag> <citation> : ajoute la citation <citation> au tag <tag>.")
-      when /^refresh$/
-        say_loud "Synchronisation avec la base..."
-        init_DB
-        say_loud "Terminé !"
-      when /^bite$/
-        say_action "fourre sa bite dans les fesses de #{sender}."
-#       when /^addaction (\w*) (.*)$/
-#         if pattern_exists($1)
-#           add_taquet($1, $2, "action")
-#           say_loud "C'est noté !"
-#         end
-#       when /^add (\w*) (.*)$/
-#         if pattern_exists($1)
-#           add_taquet($1, $2, "loud")
-#           say_loud "C'est noté !"
-#         end
-#       when /^addpattern (\w*) (.*)$/
-#         unless pattern_exists($1)
-#           add_pattern($1, $2)
-#           say_loud "Pattern ajouté !"
-#         end
-#       when /^patterns$/
-#         list_patterns(sender)
-      when /^fréquence$/
-        say_loud "Fréquence des insultes : 1/#{@insult_rate}."
-      when /^fréquence (\d+)$/
-        freq = Integer($1)
-        if freq > 100
-          say_loud "Nan mais là c'est beaucoup trop. Je vais plus jamais parler maintenant ! Je refuse. Essaye encore."
-        end
-        if freq == 0
-          say_loud "Ok, je ferme ma gueule. Mais je reviendrai tas de punaises."
-        end
-        @insult_rate = freq
-        say_loud "Fréquence des insultes initialisée à 1/#{$1}."
-        puts @insult_rate
-      when /^quote$/
-        random_quote
-      when /^quote (\w*)$/
-        quote($1)
-      when /^quote (\w*) (.*)$/
-        add_quote($1, $2)
-      when /^quotes$/
-        list_quotes(sender)
-      when /^join #(\w*)$/
-        join_channel $1
-        @channels << $1
-      when /^leave #(\w*)$/
-        if @channels.delete($1)
-          leave_channel $1
-        end
-      when /^focus #(\w*)$/
-        if @channels.include?($1)
-          focus_channel $1
-        end
-      end
-    end      
-  end
-
-  def handle_privmsg(line)
-    m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)
-    if target == "##{@channel}"
-      control_flood sender
-      case msg
-      when /^(.*\s)*citation du jour(\s.*)*$/i
-        daily_quote
-        return
-      when /^(.*\s)*(\w{6,8})(\s.*)*$/i
-        if rand(@insult_rate) == 0
-          mot = $2
-          if mot[0..0] =~ /[aeiouyéèïëöæœêâî]/i
-            say_loud "C'est toi l'#{mot} !"
-          else
-            say_loud "C'est toi le #{mot} !"
+          whisper(sender, "!quote : affiche une citation au hasard.")
+          whisper(sender, "!quote <tag> : affiche une citation tirée de <tag>.")
+          whisper(sender, "!quote <tag> <citation> : ajoute la citation <citation> au tag <tag>.")
+        when /^refresh$/
+          say_loud "Synchronisation avec la base..."
+          init_DB
+          say_loud "Terminé !"
+        when /^bite$/
+          say_action "fourre sa bite dans les fesses de #{sender}."
+          #       when /^addaction (\w*) (.*)$/
+          #         if pattern_exists($1)
+          #           add_taquet($1, $2, "action")
+          #           say_loud "C'est noté !"
+          #         end
+          #       when /^add (\w*) (.*)$/
+          #         if pattern_exists($1)
+          #           add_taquet($1, $2, "loud")
+          #           say_loud "C'est noté !"
+          #         end
+          #       when /^addpattern (\w*) (.*)$/
+          #         unless pattern_exists($1)
+          #           add_pattern($1, $2)
+          #           say_loud "Pattern ajouté !"
+          #         end
+          #       when /^patterns$/
+          #         list_patterns(sender)
+        when /^fréquence$/
+          say_loud "Fréquence des insultes : 1/#{@insult_rate}."
+        when /^fréquence (\d+)$/
+          freq = Integer($1)
+          if freq > 100
+            say_loud "Nan mais là c'est beaucoup trop. Je vais plus jamais parler maintenant ! Je refuse. Essaye encore."
+          end
+          if freq == 0
+            say_loud "Ok, je ferme ma gueule. Mais je reviendrai tas de punaises."
+          end
+          @insult_rate = freq
+          say_loud "Fréquence des insultes initialisée à 1/#{$1}."
+          puts @insult_rate
+        when /^quote$/
+          random_quote
+        when /^quote (\w*)$/
+          quote($1)
+        when /^quote (\w*) (.*)$/
+          add_quote($1, $2)
+        when /^quotes$/
+          list_quotes(sender)
+        when /^join #(\w*)$/
+          join_channel $1
+          @channels << $1
+        when /^leave #(\w*)$/
+          if @channels.delete($1)
+            leave_channel $1
+          end
+        when /^focus #(\w*)$/
+          if @channels.include?($1)
+            focus_channel $1
           end
         end
-        return
-      when /#{@nick}/i
-        trigger_pattern("hilight", nil, sender, 1)
-        return
-      else
-        trigger_pattern("gratuit", nil, sender, @insult_rate)
-      end
-      row = find_pattern(msg, sender)
-      if(row)
-        trigger_pattern(row[0], row[1], sender, @reactionProba)
-        return
+      end      
+    end
+  end
+  
+  def handle_privmsg(line)
+    m, sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)
+    
+    if @nick == target
+      whisper(sender, "J'parle pas aux connards, et sûrement pas en privé.")
+    elsif target.start_with?('#')
+      chan = target.split('#')[1]
+      if @channels.include?(chan)
+        control_flood(sender, chan)
+        @channel = chan
+        case msg
+        when /^(.*\s)*citation du jour(\s.*)*$/i
+          daily_quote
+          return
+        when /^(.*\s)*(\w{6,8})(\s.*)*$/i
+          if rand(@insult_rate) == 0
+            mot = $2
+            if mot[0..0] =~ /[aeiouyéèïëöæœêâî]/i
+              say_loud "C'est toi l'#{mot} !"
+            else
+              say_loud "C'est toi le #{mot} !"
+            end
+          end
+          return
+        when /#{@nick}/i
+          trigger_pattern("hilight", nil, sender, 1)
+          return
+        else
+          trigger_pattern("gratuit", nil, sender, @insult_rate)
+        end
+        row = find_pattern(msg, sender)
+        if(row)
+          trigger_pattern(row[0], row[1], sender, @reactionProba)
+          return
+        end
       end
     end
   end
@@ -181,7 +190,7 @@ class Gros_Singe
     @server = server
     @port = port
     @channel = channel
-    @channels = Array.new [ @channel ]
+    @channels = Array.new [ @channel, "testouille" ]
     @nick = nick
     @pwd = pwd
     @socket = TCPSocket.new server, port
@@ -261,8 +270,10 @@ class Gros_Singe
   end
 
   def run
-    gaehn = Timeout.new(6000) { random_quote }
+    timeout = Timeout.new(6111) { random_quote }
+
     while line = @socket.gets.strip
+
       # Gestion du ping
       # On le traite directement, sans passer par un thread
       if line =~/^PING :(.*)/
@@ -272,7 +283,7 @@ class Gros_Singe
       end
       puts line
       
-      gaehn.reset
+      timeout.reset
 
       # Gestion du flood
       next if @old_line == line
@@ -294,7 +305,7 @@ class Gros_Singe
 
   def say(msg)
     @mutex.synchronize{
-      puts "#{@nick} : " + msg
+      puts "#{@nick}: " + msg
       @socket.puts msg
     }
   end
