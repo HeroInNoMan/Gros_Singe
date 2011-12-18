@@ -13,15 +13,17 @@ class Gros_Singe
     @db.execute( "INSERT INTO \"#{@patterns}\" VALUES (\"#{name}\", \"#{pattern}\")" ) unless pattern_exists(name)
   end
 
-  def add_quote(key, text)
-    @db.execute( "INSERT INTO \"#{@citations}\" VALUES (\"#{key}\", \"#{text}\")" )
-    say_loud "Citation ajoutée !"
+  def add_quote(key, text, quiet)
+    unless quote_exists(key, text)
+      @db.execute( "INSERT INTO \"#{@citations}\" VALUES (\"#{key}\", \"#{text}\")" ) 
+      say_loud "C'est noté !" unless quiet
+    end
   end
 
   def add_taquet(pattern, taquet, speak_type)
-    if pattern_exists(pattern)
-      @db.execute( "INSERT INTO \"#{@taquets}\" VALUES (\"#{pattern}\", \"#{taquet}\", \"#{speak_type}\")" )
-    end
+#     if pattern_exists(pattern)
+    @db.execute( "INSERT INTO \"#{@taquets}\" VALUES (\"#{pattern}\", \"#{taquet}\", \"#{speak_type}\")" )
+#     end
   end
 
   def control_flood(chan)
@@ -37,23 +39,23 @@ class Gros_Singe
   end
 
   def daily_quote
-    puts 'daily_quote...'
+    logs 'daily_quote...'
     @daily_quote.fetch_quotes # marche pas
     say_loud @daily_quote.get_quote
     #     say_loud %x[bash fetch_quote.rb]
-    puts 'done!'
+    logs 'done!'
   end
 
   def find_pattern(msg)
-    @db.execute( "SELECT * FROM \"#{@patterns}\"" ) do |row|
+    @db.execute("SELECT * FROM " + @patterns) do |row|
       if row[1] and /#{row[1]}/.match(msg)
-          return row
+        return row
       end
     end
     return nil
   end
 
-  def handle_command(command, query)
+  def handle_command(command)
 #    arg = command[/[^ ]+ +(.+)/, 1]  
     case command
     when /^help$/
@@ -109,7 +111,7 @@ class Gros_Singe
     when /^quote (\w*)$/
       quote($1)
     when /^quote (\w*) (.*)$/
-      add_quote($1, $2)
+      add_quote($1, $2, false)
     when /^quotes$/
       list_quotes(sender)
     when /^join #(\w*)$/
@@ -129,31 +131,39 @@ class Gros_Singe
     end
     case msg
     when /^!(.*)/
-      handle_command $1, query
+      handle_command $1
       return
     when /^(.*\s)*citation du jour(\s.*)*$/i
       daily_quote
       return
-    when /^(.*\s)*(\w{6,8})(\s.*)*$/i
+    when /^lo+l$/i
+      add_taquet("drole", @prev_msg, "loud")
+      logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
+    when /^(https?:\/\/[^ ]+)/i
+      url = $1
+      unless url =~ /pastis\.tristramg\.eu/
+        add_quote("url", url, true)
+        logs "*** url apprise : « " + url + " »."
+      end
+#     when /#{@nick}/i
+#       trigger_pattern("hilight", nil, 1)
+    end
+    row = find_pattern(msg)
+    if row
+      trigger_pattern(row[0], row[1], @reactionProba)
+    elsif msg =~ /^(.*\s)*(\w{6,8})(\s.*)*$/
       if rand(@insult_rate) == 0
         mot = $2
         if mot[0..0] =~ /[aeiouyéèïëöæœêâî]/i
-          say_loud "C'est toi l'#{mot} !"
+          say_loud "C’est toi l’#{mot} !"
         else
-          say_loud "C'est toi le #{mot} !"
+          say_loud "C’est toi le #{mot} !"
         end
       end
-      return
-    when /#{@nick}/i
-      trigger_pattern("hilight", nil, 1)
-      return
     else
-      trigger_pattern("gratuit", nil, @insult_rate)
-    end
-    row = find_pattern(msg)
-    if(row)
-      trigger_pattern(row[0], row[1], @reactionProba)
-      return
+      unless trigger_pattern("drole", nil, @insult_rate)
+        trigger_pattern("gratuit", nil, @insult_rate)
+      end
     end
   end
   
@@ -165,12 +175,15 @@ class Gros_Singe
   end
   
   def initialize(server, port, channel, nick, pwd)
+    @verbose_mode = nil
     @flood_counter = 0
     @insult_rate = 42
     @reactionProba = 4
     @server = server
     @port = port
     @sender=""
+    @prev_line=""
+    @prev_msg=""
     @channel = channel
     @channels = Array.new [ @channel, "testouille" ]
     @nick = nick
@@ -184,14 +197,6 @@ class Gros_Singe
 #   say "PRIVMSG NICKSERV : IDENTIFY #{@pwd}"
     init_DB
     speak_answer("init")  if rand(@reactionProba) == 0
-  end
-
-  def is_command(line)
-    return line =~ /PRIVMSG ([^ :]+) +:!(.+)/
-  end
-
-  def is_privmsg(line)
-    return line =~ /PRIVMSG ([^ :]+) +:(.+)/
   end
 
   def join_channel(chan)
@@ -222,11 +227,13 @@ class Gros_Singe
     whisper("* Total : #{total}")
   end
 
+  def logs(txt)
+    puts txt if @verbose_mode
+  end
+
   def pattern_exists(pattern)
     count = @db.get_first_value( "SELECT COUNT (*) FROM \"#{@taquets}\" WHERE key = \"#{pattern}\"" )
-    unless Integer(count) == 0
-      return 1
-    end
+    return 1 unless Integer(count) == 0
   end
 
   def quote(key)
@@ -235,6 +242,11 @@ class Gros_Singe
       rows = @db.execute( "SELECT * FROM \"#{@citations}\" WHERE key = \"#{key}\"" )
       say_loud rows[rand(rows.size)][1]
     end
+  end
+  
+  def quote_exists(key, text)
+    count = @db.get_first_value( "SELECT COUNT (*) FROM \"#{@citations}\" WHERE key = \"#{key}\" AND text = \"#{text}\"")
+    return 1 unless Integer(count) == 0
   end
 
   def random_quote
@@ -265,23 +277,23 @@ class Gros_Singe
 
       puts line
 
-      next unless is_privmsg line
+      next unless line =~ /PRIVMSG ([^ :]+) +:(.+)/
 
       timeout.reset
       
-      next if @old_line == line
-      @old_line = line
+      next if @prev_line == line
+      @prev_line = line
       
       m, @sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)
       
       if @nick == target
-        Thread.new{handle_privmsg msg, true}
+        Thread.new{handle_privmsg(msg, true); @prev_msg = msg}
       elsif target.start_with?('#')
         chan = target.split('#')[1]
         if @channels.include?(chan)
           control_flood(chan)
           @channel = chan
-          Thread.new{handle_privmsg msg, false}
+          Thread.new{handle_privmsg(msg, false); @prev_msg = msg}
         end
       end
     end
@@ -316,16 +328,17 @@ class Gros_Singe
 
   def trigger_pattern(pattern_name, pattern, probability)
     log = "*** "
-    if(pattern)
+    if pattern
       log+="matched " + pattern_name + " : " + pattern + " "
     end
     loto = rand(probability)
     if loto == 0
-      puts log + "(answer triggered)"
+      logs log + "(answer triggered)"
       speak_answer(pattern_name)
-    else
-      puts log + "(no answer triggered: " + loto.to_s + "/" + probability.to_s + ")"
+      return true
     end
+    logs log + "(no answer triggered: " + loto.to_s + "/" + probability.to_s + ")"
+    return false
   end
   
   def whisper(msg)
