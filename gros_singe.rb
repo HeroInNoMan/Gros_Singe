@@ -117,6 +117,9 @@ class Gros_Singe
     when /^join #(\w*)$/
       join_channel $1
       @channels << $1
+    when /^leave$/
+      @channels.delete(@channel)
+      leave_channel @channel
     when /^leave #(\w*)$/
       if @channels.delete($1)
         leave_channel $1
@@ -126,7 +129,13 @@ class Gros_Singe
   
   def handle_privmsg(msg, query)
     if query
-      whisper("J’parle pas aux connards, et sûrement pas en privé.")
+      case msg
+      when /^!join #(\w*)$/
+        join_channel $1
+        @channels << $1
+      else
+        whisper("J’parle pas aux connards, et sûrement pas en privé.")
+      end
       return
     end
     case msg
@@ -184,8 +193,8 @@ class Gros_Singe
     @sender=""
     @prev_line=""
     @prev_msg=""
-    @channel = channel
-    @channels = Array.new [ @channel, "testouille" ]
+    @channel = "testouille"
+    @channels = Array.new [ "testouille" ]
     @nick = nick
     @pwd = pwd
     @socket = TCPSocket.new server, port
@@ -344,7 +353,7 @@ class Gros_Singe
   def whisper(msg)
     say "PRIVMSG #{@sender}: #{msg}"
   end
-
+  
 end 
 
 conf = YAML.parse_file('gros_singe.yaml')
