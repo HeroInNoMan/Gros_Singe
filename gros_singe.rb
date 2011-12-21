@@ -21,11 +21,9 @@ class Gros_Singe
   end
 
   def add_taquet(pattern, taquet, speak_type)
-#     if pattern_exists(pattern)
     @db.execute( "INSERT INTO \"#{@taquets}\" VALUES (\"#{pattern}\", \"#{taquet}\", \"#{speak_type}\")" )
-#     end
   end
-
+  
   def control_flood(chan)
     if @sender == @old_sender and chan == @channel
       @flood_counter+=1
@@ -121,23 +119,18 @@ class Gros_Singe
       @channels.delete(@channel)
       leave_channel @channel
     when /^leave #(\w*)$/
-      if @channels.delete($1)
-        leave_channel $1
+      chan = $1
+      if @channels.delete(chan)
+        leave_channel chan
       end
+    when /^repeat #(\w+) (.*)/
+        repeat($1, $2)
+    when /^repeataction #(\w+) (.*)/
+        repeat_action($1, $2)
     end
   end
   
   def handle_privmsg(msg, query)
-    if query
-      case msg
-      when /^!join #(\w*)$/
-        join_channel $1
-        @channels << $1
-      else
-        whisper("J’parle pas aux connards, et sûrement pas en privé.")
-      end
-      return
-    end
     case msg
     when /^!(.*)/
       handle_command $1
@@ -154,8 +147,6 @@ class Gros_Singe
         add_quote("url", url, true)
         logs "*** url apprise : « " + url + " »."
       end
-#     when /#{@nick}/i
-#       trigger_pattern("hilight", nil, 1)
     end
     row = find_pattern(msg)
     if row
@@ -270,6 +261,14 @@ class Gros_Singe
         say_loud "#{quote[1]} (#{quote[0]})"
       end
     end
+  end
+
+  def repeat(chan, msg)
+    say "PRIVMSG ##{chan} :#{msg}"
+  end
+
+  def repeat_action(chan, msg)
+    say "PRIVMSG ##{chan} :#{1.chr}ACTION #{msg}#{1.chr}"
   end
 
   def run
