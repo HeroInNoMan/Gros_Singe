@@ -4,7 +4,7 @@ require 'socket'
 require 'sqlite3'
 require 'yaml'
 require 'thread'
-require 'Timeout'
+require 'KillTime'
 require 'Daily_Quote'
 
 class Gros_Singe
@@ -37,11 +37,8 @@ class Gros_Singe
   end
 
   def daily_quote
-    logs 'daily_quote...'
-    @daily_quote.fetch_quotes # marche pas
+    @daily_quote.fetch_quotes
     say_loud @daily_quote.get_quote
-    #     say_loud %x[bash fetch_quote.rb]
-    logs 'done!'
   end
 
   def find_matching_patterns(msg)
@@ -137,10 +134,13 @@ class Gros_Singe
     when /^!(.*)/
       handle_command $1
       return
-    when /citation du jour/i
+    when /citation|quote/i
       daily_quote
       return
     when /^lo+l$/i
+      add_taquet("drole", @prev_msg, "loud")
+      logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
+    when /^mdr+$/i
       add_taquet("drole", @prev_msg, "loud")
       logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
     when /^(h[aeioué]){2,}$/i
@@ -277,7 +277,7 @@ class Gros_Singe
   end
 
   def run
-    timeout = Timeout.new(6111) { random_quote }
+    timeout = KillTime.new(6111) { random_quote }
 
     while line = @socket.gets.strip
 

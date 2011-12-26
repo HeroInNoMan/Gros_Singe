@@ -20,7 +20,7 @@ class Daily_Quote
     open('http://www.citation-du-jour.fr/') do |f|
       f.each do |line|
         if line.include? '<blockquote lang="fr">'
-      arr = line.split('<blockquote lang="fr">')
+          arr = line.split('<blockquote lang="fr">')
           @quotes << arr[1].split('</blockquote>')[0].gsub('&#039;', '’')
         end
       end

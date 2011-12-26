@@ -1,5 +1,5 @@
 
-class Timeout
+class KillTime
   def initialize(tps, &blk)
     @last = Time.now
     @thread = Thread.new do
