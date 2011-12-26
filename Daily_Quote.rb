@@ -9,17 +9,11 @@ class Daily_Quote
   end
   
   def fetch_quotes
-    puts 1
     open('http://www.evene.fr/citations/citation-jour.php') do |f|
-      puts 2
       f.each do |line|
-        puts 3
         if line.include? "data-text" and !(line.include? "La citation du jour")
-          puts 4
           arr = line.split('data-text="')
-          puts 5
           @quotes << arr[1].split('" >')[0].gsub('&#039;', '’')
-          puts 6
         end
       end
     end

@@ -44,15 +44,16 @@ class Gros_Singe
     logs 'done!'
   end
 
-  def find_pattern(msg)
+  def find_matching_patterns(msg)
+    patterns = Array.new
     @db.execute("SELECT * FROM " + @patterns) do |row|
       if row[1] and /#{row[1]}/.match(msg)
-        return row
+          patterns << row
       end
     end
-    return nil
+    return patterns
   end
-
+  
   def handle_command(command)
 #    arg = command[/[^ ]+ +(.+)/, 1]  
     case command
@@ -60,6 +61,7 @@ class Gros_Singe
       whisper("!help : affiche la liste des commandes.")
 #       whisper("!refresh : synchronise à la base de données.")
       whisper("!fréquence <X> : insulte les gens toutes les X interventions en moyenne.")
+
       whisper("!fréquence : affiche la fréquence d'insulte actuelle.")
 #       whisper("!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
 #       whisper("!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me).")
@@ -106,19 +108,19 @@ class Gros_Singe
       end
     when /^quote$/
       random_quote
-    when /^quote (\w*)$/
+    when /^quote (\w+)$/
       quote($1)
-    when /^quote (\w*) (.*)$/
+    when /^quote (\w+) (.*)$/
       add_quote($1, $2, false)
     when /^quotes$/
       list_quotes(sender)
-    when /^join #(\w*)$/
+    when /^join #(\w+)$/
       join_channel $1
       @channels << $1
     when /^leave$/
       @channels.delete(@channel)
       leave_channel @channel
-    when /^leave #(\w*)$/
+    when /^leave #(\w+)$/
       chan = $1
       if @channels.delete(chan)
         leave_channel chan
@@ -135,10 +137,13 @@ class Gros_Singe
     when /^!(.*)/
       handle_command $1
       return
-    when /^(.*\s)*citation du jour(\s.*)*$/i
+    when /citation du jour/i
       daily_quote
       return
     when /^lo+l$/i
+      add_taquet("drole", @prev_msg, "loud")
+      logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
+    when /^(h[aeioué]){2,}$/i
       add_taquet("drole", @prev_msg, "loud")
       logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
     when /^(https?:\/\/[^ ]+)/i
@@ -148,9 +153,9 @@ class Gros_Singe
         logs "*** url apprise : « " + url + " »."
       end
     end
-    row = find_pattern(msg)
-    if row
-      trigger_pattern(row[0], row[1], @reactionProba)
+    rows = find_matching_patterns(msg)
+    if !rows.empty?
+      rows.each { |r| break if trigger_pattern(r[0], r[1], @reactionProba)}
     elsif msg =~ /^(.*\s)*(\w{6,8})(\s.*)*$/
       if rand(@insult_rate) == 0
         mot = $2
