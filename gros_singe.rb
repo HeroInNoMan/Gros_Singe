@@ -37,8 +37,7 @@ class Gros_Singe
   end
 
   def daily_quote
-    @daily_quote.fetch_quotes
-    say_loud @daily_quote.get_quote
+    say_loud @daily_quote.quote
   end
 
   def find_matching_patterns(msg)
@@ -180,7 +179,7 @@ class Gros_Singe
   end
   
   def initialize(server, port, channel, nick, pwd)
-    @verbose_mode = nil
+    @verbose_mode = 1
     @flood_counter = 0
     @insult_rate = 42
     @reactionProba = 4
@@ -320,11 +319,15 @@ class Gros_Singe
   end
 
   def say_action(msg)
-    say "PRIVMSG ##{@channel} :#{1.chr}ACTION #{msg}#{1.chr}"
+    msg.split("\n").each{|line|
+      say "PRIVMSG ##{@channel} :#{1.chr}ACTION #{line}#{1.chr}"
+    }
   end
 
   def say_loud(msg)
-    say "PRIVMSG ##{@channel} :#{msg}"
+    msg.split("\n").each{|line|
+      say "PRIVMSG ##{@channel} :#{line}"
+    }
   end
 
   def speak_answer(pattern)
