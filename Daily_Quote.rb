@@ -6,6 +6,7 @@ class Daily_Quote
 
   def initialize
     @quotes = Array.new
+    @topics = fetch_topics
   end
 
   def fetch_daily_quote
@@ -58,11 +59,42 @@ class Daily_Quote
     begin
       fetch_evene_quote
       fetch_daily_quote
+      fetch_wisdom_quote('life', 2 + rand(11))
+      fetch_wisdom_quote('death', 2 + rand(1))
+      fetch_wisdom_quote('love', 2 + rand(9))
+      fetch_wisdom_quote('agnosticismatheism', 2 + rand(1))
     rescue
       puts "Error while fetching quote"
     end
   end
 
+  def fetch_topics
+    topics = Array.new
+    open('http://www.wisdomquotes.com/topics.html') do |f|
+      f.each do |line|
+        if line.include? '<a href="topics/'
+          topics << line.split('<a href="topics/')[1].split('/')[0]
+        end
+      end
+    end
+    return topics
+  end
+  
+  def fetch_wisdom_quote(topic, num)
+    @prev = ""
+    open('http://www.wisdomquotes.com/topics/' + topic + '/index' + num.to_s + '.html') do |f|
+      f.each do |line|
+        # prendre la ligne si la suivante est bien alignée à droite (auteur)
+        if line.include? '<p align="right">- ' and @prev.include? '<p>'
+          quote = @prev.split('<p>')[1].split('</p>')[0]
+          author = line.split('<p align="right">- ')[1]
+          @quotes << quote + "\n" + author
+        end
+        @prev = line
+      end
+    end
+  end
+  
   def load_more_quotes(nb)
     begin
       nb.times do
