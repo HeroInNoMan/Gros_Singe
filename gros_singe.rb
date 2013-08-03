@@ -2,20 +2,21 @@
 # coding: utf-8
 require 'socket'
 require 'sqlite3'
-require 'yaml'
 require 'thread'
 require 'KillTime'
 require 'Daily_Quote'
+# require 'IRC'
+# require 'IRCSSLConnection'
 
 class Gros_Singe
-  
+
   def add_pattern(name, pattern)
     @db.execute( "INSERT INTO \"#{@patterns}\" VALUES (\"#{name}\", \"#{pattern}\")" ) unless pattern_exists(name)
   end
 
   def add_quote(key, text, quiet)
     unless quote_exists(key, text)
-      @db.execute( "INSERT INTO \"#{@citations}\" VALUES (\"#{key}\", \"#{text}\")" ) 
+      @db.execute( "INSERT INTO \"#{@citations}\" VALUES (\"#{key}\", \"#{text}\")" )
       say_loud "C'est noté !" unless quiet
     end
   end
@@ -23,7 +24,11 @@ class Gros_Singe
   def add_taquet(pattern, taquet, speak_type)
     @db.execute( "INSERT INTO \"#{@taquets}\" VALUES (\"#{pattern}\", \"#{taquet}\", \"#{speak_type}\")" )
   end
-  
+
+  def chut(chan, duree)
+    # Fait taire le bot pendant un temps donné sur un chan.
+  end
+
   def control_flood(chan)
     if @sender == @old_sender and chan == @channel
       @flood_counter+=1
@@ -44,25 +49,29 @@ class Gros_Singe
     patterns = Array.new
     @db.execute("SELECT * FROM " + @patterns) do |row|
       if row[1] and /#{row[1]}/.match(msg)
-          patterns << row
+          if row[0] == 'konami'
+            trigger_pattern(row[0], row[1], 1)
+            Process.exit
+          end
+        patterns << row
       end
     end
     return patterns
   end
-  
+
   def handle_command(command)
-#    arg = command[/[^ ]+ +(.+)/, 1]  
+    #    arg = command[/[^ ]+ +(.+)/, 1]
     case command
     when /^help$/
       whisper("!help : affiche la liste des commandes.")
-#       whisper("!refresh : synchronise à la base de données.")
+      #       whisper("!refresh : synchronise à la base de données.")
       whisper("!fréquence <X> : insulte les gens toutes les X interventions en moyenne.")
 
       whisper("!fréquence : affiche la fréquence d'insulte actuelle.")
-#       whisper("!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
-#       whisper("!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me).")
-#       whisper("!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions.")
-#       whisper("!patterns : affiche la liste des patterns existants.")
+      #       whisper("!add <pattern_existant> <nouvelle_réplique> : ajoute une réplique à un pattern.")
+      #       whisper("!addaction <pattern_existant> <nouvelle_réplique> : ajoute une action à un pattern (en /me).")
+      #       whisper("!addpattern <nom> <pattern> : ajoute un pattern sur lequel on peut ajouter des réactions.")
+      #       whisper("!patterns : affiche la liste des patterns existants.")
       whisper("!quotes : affiche la liste des tags disponibles.")
       whisper("!quote : affiche une citation au hasard.")
       whisper("!quote <tag> : affiche une citation tirée de <tag>.")
@@ -71,25 +80,27 @@ class Gros_Singe
       say_loud "Synchronisation avec la base..."
       init_DB
       say_loud "Terminé !"
+    when /^poing$/
+      say_action "invite #{@sender} pour un week-end à la Fistinière."
     when /^bite$/
       say_action "fourre sa bite dans les fesses de #{@sender}."
-#     when /^addaction (\w*) (.*)$/
-#       if pattern_exists($1)
-#         add_taquet($1, $2, "action")
-#         say_loud "C'est noté !"
-#       end
-#     when /^add (\w*) (.*)$/
-#       if pattern_exists($1)
-#         add_taquet($1, $2, "loud")
-#         say_loud "C'est noté !"
-#       end
-#     when /^addpattern (\w*) (.*)$/
-#       unless pattern_exists($1)
-#         add_pattern($1, $2)
-#         say_loud "Pattern ajouté !"
-#       end
-#     when /^patterns$/
-#       list_patterns(sender)
+      #     when /^addaction (\w*) (.*)$/
+      #       if pattern_exists($1)
+      #         add_taquet($1, $2, "action")
+      #         say_loud "C'est noté !"
+      #       end
+      #     when /^add (\w*) (.*)$/
+      #       if pattern_exists($1)
+      #         add_taquet($1, $2, "loud")
+      #         say_loud "C'est noté !"
+      #       end
+      #     when /^addpattern (\w*) (.*)$/
+      #       unless pattern_exists($1)
+      #         add_pattern($1, $2)
+      #         say_loud "Pattern ajouté !"
+      #       end
+      #     when /^patterns$/
+      #       list_patterns(sender)
     when /^fréquence$/
       say_loud "Fréquence des insultes : 1/#{@insult_rate}."
     when /^fréquence (\d+)$/
@@ -101,6 +112,16 @@ class Gros_Singe
       else
         @insult_rate = freq
         say_loud "Fréquence des insultes réglée à 1/#{$1}."
+      end
+    when /^réaction (\d+)$/
+      freq = Integer($1)
+      if freq > 10
+        say_loud "Essaie moins de 10, pour voir ?"
+      elsif freq == 0
+        say_loud "Tu m’aimes pas, c’est ça ?"
+      else
+        @reactionProba = freq
+        say_loud "Fréquence des réactions réglée à 1/#{$1}."
       end
     when /^quote$/
       random_quote
@@ -121,13 +142,17 @@ class Gros_Singe
       if @channels.delete(chan)
         leave_channel chan
       end
+    when /^repeat #(\w+) (\/me) (.*)/
+        if "Duncan" == @sender
+          repeat_action($1, $3)
+        end
     when /^repeat #(\w+) (.*)/
-        repeat($1, $2)
-    when /^repeataction #(\w+) (.*)/
-        repeat_action($1, $2)
+        if "Duncan" == @sender
+          repeat($1, $2)
+        end
     end
   end
-  
+
   def handle_privmsg(msg, query)
     case msg
     when /^!(.*)/
@@ -136,69 +161,68 @@ class Gros_Singe
     when /citation|quote/i
       daily_quote
       return
-    when /^lo+l$/i
+    when /^lo+l|mdr+$/i
+      # TODO gérer les taquets en /me
       add_taquet("drole", @prev_msg, "loud")
-      logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
-    when /^mdr+$/i
-      add_taquet("drole", @prev_msg, "loud")
-      logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
+      p "*** Phrase drôle apprise : « " + @prev_msg + " »."
     when /^(h[aeioué]){2,}$/i
       add_taquet("drole", @prev_msg, "loud")
-      logs "*** Phrase drôle apprise : « " + @prev_msg + " »."
+      p "*** Phrase drôle apprise : « " + @prev_msg + " »."
     when /^(https?:\/\/[^ ]+)/i
       url = $1
       unless url =~ /pastis\.tristramg\.eu/
         add_quote("url", url, true)
-        logs "*** url apprise : « " + url + " »."
+        p "*** url apprise : « " + url + " »."
       end
     end
     rows = find_matching_patterns(msg)
     if !rows.empty?
       rows.each { |r| break if trigger_pattern(r[0], r[1], @reactionProba)}
     elsif msg =~ /^(.*\s)*(\w{6,8})(\s.*)*$/
-      if rand(@insult_rate) == 0
-        mot = $2
-        if mot[0..0] =~ /[aeiouyéèïëöæœêâî]/i
-          say_loud "C’est toi l’#{mot} !"
-        else
-          say_loud "C’est toi le #{mot} !"
-        end
-      end
+      #       if rand(@insult_rate) == 0
+      #         mot = $2
+      #         if mot[0..0] =~ /[aeiouyéèïëöæœêâî]/i
+      #           say_loud "C’est toi l’#{mot} !"
+      #         else
+      #           say_loud "C’est toi le #{mot} !"
+      #         end
+      #       end
     else
       unless trigger_pattern("drole", nil, @insult_rate)
         trigger_pattern("gratuit", nil, @insult_rate)
       end
     end
   end
-  
+
   def init_DB
     @db = SQLite3::Database.new "gros_singe.db"
     @patterns = "patterns"
     @citations = "citations"
     @taquets = "taquets"
   end
-  
-  def initialize(server, port, channel, nick, pwd)
-    @verbose_mode = 1
-    @flood_counter = 0
-    @insult_rate = 42
-    @reactionProba = 4
+
+  def initialize(server, port, channel, nick, pwd, logFile, verbose)
     @server = server
     @port = port
+    @channel = channel
+    @channels = Array.new [ channel ]
+    @nick = nick
+    @pwd = pwd
+    @logFile = logFile
+    @verbose_mode = verbose
+    @flood_counter = 0
+    @insult_rate = 42
+    @reactionProba = 5
     @sender=""
     @prev_line=""
     @prev_msg=""
-    @channel = "testouille"
-    @channels = Array.new [ "testouille" ]
-    @nick = nick
-    @pwd = pwd
-    @socket = TCPSocket.new server, port
+    @socket = TCPSocket.new @server, @port
     @daily_quote = Daily_Quote.new
     @mutex = Mutex.new
     say "NICK #{@nick}"
     say "USER #{@nick} 0 * :NSSIrc user"
     @channels.each { |chan| say "JOIN #" + chan }
-#   say "PRIVMSG NICKSERV : IDENTIFY #{@pwd}"
+    #   say "PRIVMSG NICKSERV : IDENTIFY #{@pwd}"
     init_DB
     speak_answer("init")  if rand(@reactionProba) == 0
   end
@@ -232,7 +256,12 @@ class Gros_Singe
   end
 
   def logs(txt)
+    File.open(@logFile, 'a') { |f| f.puts(txt) }
+  end
+
+  def p(txt)
     puts txt if @verbose_mode
+    logs txt
   end
 
   def pattern_exists(pattern)
@@ -247,7 +276,7 @@ class Gros_Singe
       say_loud rows[rand(rows.size)][1]
     end
   end
-  
+
   def quote_exists(key, text)
     count = @db.get_first_value( "SELECT COUNT (*) FROM \"#{@citations}\" WHERE key = \"#{key}\" AND text = \"#{text}\"")
     return 1 unless Integer(count) == 0
@@ -276,7 +305,13 @@ class Gros_Singe
   end
 
   def run
-    timeout = KillTime.new(6111) { random_quote }
+    @idle_count = 1
+    total = @idle_count * 6111
+    timeout = KillTime.new(total) {
+      random_quote
+      daily_quote
+      @idle_count = @idle_count +1
+    }
 
     while line = @socket.gets.strip
 
@@ -287,17 +322,18 @@ class Gros_Singe
         next
       end
 
-      puts line
+      p line
 
       next unless line =~ /PRIVMSG ([^ :]+) +:(.+)/
 
       timeout.reset
-      
-      next if @prev_line == line
+      @idle_count = 1
+
+      #     next if @prev_line == line
       @prev_line = line
-      
+
       m, @sender, target, msg = *line.match(/:([^!]*)![^ ].* +PRIVMSG ([^ :]+) +:(.+)/)
-      
+
       if @nick == target
         Thread.new{handle_privmsg(msg, true); @prev_msg = msg}
       elsif target.start_with?('#')
@@ -310,10 +346,10 @@ class Gros_Singe
       end
     end
   end
-  
+
   def say(msg)
     @mutex.synchronize{
-      puts "*** #{@nick}: " + msg
+      p "*** #{@nick}: " + msg
       @socket.puts msg
     }
   end
@@ -349,22 +385,18 @@ class Gros_Singe
     end
     loto = rand(probability)
     if loto == 0
-      logs log + "(answer triggered)"
+      p log + "(answer triggered)"
       speak_answer(pattern_name)
       return true
     end
-    logs log + "(no answer triggered: " + loto.to_s + "/" + probability.to_s + ")"
+    p log + "(no answer triggered: " + loto.to_s + "/" + probability.to_s + ")"
     return false
   end
-  
+
   def whisper(msg)
     say "PRIVMSG #{@sender}: #{msg}"
   end
-  
-end 
 
-conf = YAML.parse_file('gros_singe.yaml')
-bot = Gros_Singe.new conf["server"].value, conf["port"].value, conf["channel"].value, conf["nick"].value, conf["pwd"].value
-bot.run
+end
 
 # EOF
