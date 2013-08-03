@@ -1,12 +1,12 @@
 #!/usr/bin/ruby
 # coding: utf-8
+
+require 'logger'
 require 'socket'
 require 'sqlite3'
 require 'thread'
 require 'KillTime'
 require 'Daily_Quote'
-# require 'IRC'
-# require 'IRCSSLConnection'
 
 class Gros_Singe
 
@@ -49,10 +49,10 @@ class Gros_Singe
     patterns = Array.new
     @db.execute("SELECT * FROM " + @patterns) do |row|
       if row[1] and /#{row[1]}/.match(msg)
-          if row[0] == 'konami'
-            trigger_pattern(row[0], row[1], 1)
-            Process.exit
-          end
+        if row[0] == 'konami'
+          trigger_pattern(row[0], row[1], 1)
+          Process.exit
+        end
         patterns << row
       end
     end
@@ -143,13 +143,13 @@ class Gros_Singe
         leave_channel chan
       end
     when /^repeat #(\w+) (\/me) (.*)/
-        if "Duncan" == @sender
-          repeat_action($1, $3)
-        end
+      if "Duncan" == @sender
+        repeat_action($1, $3)
+      end
     when /^repeat #(\w+) (.*)/
-        if "Duncan" == @sender
-          repeat($1, $2)
-        end
+      if "Duncan" == @sender
+        repeat($1, $2)
+      end
     end
   end
 
@@ -194,21 +194,23 @@ class Gros_Singe
     end
   end
 
-  def init_DB
-    @db = SQLite3::Database.new "gros_singe.db"
+  def init_DB(database)
+    @db = SQLite3::Database.new database
     @patterns = "patterns"
     @citations = "citations"
     @taquets = "taquets"
   end
 
-  def initialize(server, port, channel, nick, pwd, logFile, verbose)
+  def initialize(database, server, port, channel, nick, pwd, logFile, verbose)
+    init_DB(database)
     @server = server
     @port = port
     @channel = channel
     @channels = Array.new [ channel ]
     @nick = nick
     @pwd = pwd
-    @logFile = logFile
+    @logger = Logger.new(logFile, 'weekly')
+    @logger.level = Logger::DEBUG
     @verbose_mode = verbose
     @flood_counter = 0
     @insult_rate = 42
@@ -223,7 +225,6 @@ class Gros_Singe
     say "USER #{@nick} 0 * :NSSIrc user"
     @channels.each { |chan| say "JOIN #" + chan }
     #   say "PRIVMSG NICKSERV : IDENTIFY #{@pwd}"
-    init_DB
     speak_answer("init")  if rand(@reactionProba) == 0
   end
 
@@ -255,13 +256,9 @@ class Gros_Singe
     whisper("* Total : #{total}")
   end
 
-  def logs(txt)
-    File.open(@logFile, 'a') { |f| f.puts(txt) }
-  end
-
   def p(txt)
     puts txt if @verbose_mode
-    logs txt
+    @logger.info(txt)
   end
 
   def pattern_exists(pattern)
